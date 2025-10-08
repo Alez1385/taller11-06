@@ -145,6 +145,41 @@ function processInscripcion($conn, $curso_id, $id_usuario, $comprobante)
             throw new Exception("Error ejecutando la inserción de inscripción: " . $stmt->error);
         }
 
+        // --- NUEVO: Limpiar inscripciones rechazadas/canceladas para este usuario y curso ---
+        $stmt = $conn->prepare("DELETE FROM inscripciones WHERE id_estudiante = ? AND id_curso = ? AND (estado = 'rechazada' OR estado = 'cancelada')");
+        $stmt->bind_param("ii", $id_estudiante, $curso_id);
+        $stmt->execute();
+
+        // --- NUEVO: Si el usuario tiene inscripción aprobada, actualizar tipo de usuario a estudiante ---
+        $stmt = $conn->prepare("SELECT COUNT(*) as total FROM inscripciones WHERE id_estudiante = ? AND estado = 'aprobada'");
+        $stmt->bind_param("i", $id_estudiante);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $total_aprobadas = 0;
+        if ($row = $result->fetch_assoc()) {
+            $total_aprobadas = $row['total'];
+        }
+        if ($total_aprobadas > 0) {
+            // Cambiar tipo de usuario a estudiante si es user
+            $stmt = $conn->prepare("SELECT id_tipo_usuario FROM usuario WHERE id_usuario = ?");
+            $stmt->bind_param("i", $id_usuario);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($row = $result->fetch_assoc()) {
+                if ($row['id_tipo_usuario'] == 4) {
+                    $stmt2 = $conn->prepare("UPDATE usuario SET id_tipo_usuario = 3 WHERE id_usuario = ?");
+                    $stmt2->bind_param("i", $id_usuario);
+                    $stmt2->execute();
+                    // Actualizar sesión si corresponde
+                    if (isset($_SESSION['id_usuario']) && $_SESSION['id_usuario'] == $id_usuario) {
+                        $_SESSION['id_tipo_usuario'] = 3;
+                        $_SESSION['user_role'] = 'estudiante';
+                    }
+                }
+            }
+        }
+        // --- FIN NUEVO ---
+
         $conn->commit();
         return true;
     } catch (Exception $e) {

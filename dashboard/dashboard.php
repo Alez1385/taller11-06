@@ -1,11 +1,15 @@
 <?php
 require_once "../scripts/conexion.php";
 require_once "../scripts/auth.php";
+require_once '../scripts/functions.php';
 
 requireLogin();
 
-// Obtener el tipo de usuario
+// Obtener el tipo de usuario SIEMPRE desde la base de datos
 $user = getUserInfo($conn, $_SESSION['id_usuario']);
+// Forzar actualización de la sesión con el valor real de la base de datos
+$_SESSION['id_tipo_usuario'] = $user['id_tipo_usuario'];
+$_SESSION['user_role'] = $user['tipo_nombre'];
 
 // Debug: Log user information
 error_log("Dashboard - User ID: " . $_SESSION['id_usuario']);
@@ -47,6 +51,7 @@ error_log("Dashboard - User Type from DB: " . ($user['tipo_nombre'] ?? 'Not set'
                             <p><strong>Nombre:</strong> <?php echo htmlspecialchars($user['nombre'] . ' ' . $user['apellido']); ?></p>
                             <p><strong>Email:</strong> <?php echo htmlspecialchars($user['mail']); ?></p>
                             <p><strong>Tipo de Usuario:</strong> <?php echo htmlspecialchars($user['tipo_nombre']); ?></p>
+                            <p><strong>ID Usuario:</strong> <?php echo htmlspecialchars($user['id_usuario']); ?></p>
                             <p><strong>Último Acceso:</strong> <?php echo htmlspecialchars(date('d/m/Y H:i:s', strtotime($user['ultimo_acceso']))); ?></p>
                         </div>
                     </div>

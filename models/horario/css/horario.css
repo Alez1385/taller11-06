@@ -29,7 +29,7 @@ body {
     font-weight: 600;
 }
 
-.btn-back, .btn-submit {
+.btn-back, .btn-submit, .btn-random {
     padding: 0.75rem 1.5rem;
     border: none;
     border-radius: 5px;
@@ -56,6 +56,23 @@ body {
 
 .btn-submit:hover {
     background-color: #2980b9;
+}
+
+.btn-random {
+    background-color: #e74c3c;
+    color: white;
+    margin-right: 1rem;
+}
+
+.btn-random:hover {
+    background-color: #c0392b;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 2rem;
 }
 
 .form-group {

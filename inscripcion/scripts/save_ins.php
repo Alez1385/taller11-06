@@ -26,6 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $id_estudiante = $user['id_estudiante'];
+    if (!$id_estudiante) {
+        $stmtCreateEst = $conn->prepare("INSERT INTO estudiante (id_usuario, fecha_registro, estado) VALUES (?, NOW(), 'activo')");
+        $stmtCreateEst->bind_param("i", $user['id_usuario']);
+        if (!$stmtCreateEst->execute()) {
+            respondWithError('Error al crear el registro de estudiante.');
+        }
+        $id_estudiante = $stmtCreateEst->insert_id;
+        $stmtCreateEst->close();
+    }
 
     // Validations
     if (!$nombre || !$email || !$telefono || !$curso_id) {
@@ -46,6 +55,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 // Start transaction
                 $conn->begin_transaction();
+
+                // Prevent duplicates (pending or approved)
+                $stmtChk = $conn->prepare("SELECT id_inscripcion FROM inscripciones WHERE id_curso = ? AND id_estudiante = ? AND estado IN ('pendiente','aprobada')");
+                $stmtChk->bind_param("ii", $curso_id, $id_estudiante);
+                $stmtChk->execute();
+                $resChk = $stmtChk->get_result();
+                if ($resChk->num_rows > 0) {
+                    $conn->rollback();
+                    respondWithError('Ya existe una inscripción vigente para este curso.');
+                }
+
+                // Remove pending preinscription if exists
+                $stmtDelPre = $conn->prepare("DELETE FROM preinscripciones WHERE id_usuario = (SELECT id_usuario FROM estudiante WHERE id_estudiante = ?) AND id_curso = ?");
+                $stmtDelPre->bind_param("ii", $id_estudiante, $curso_id);
+                $stmtDelPre->execute();
 
                 // Save inscription
                 $stmt = $conn->prepare("INSERT INTO inscripciones (id_curso, id_estudiante, fecha_inscripcion, estado, fecha_actualizacion, comprobante_pago) VALUES (?, ?, NOW(), 'pendiente', NOW(), ?)");

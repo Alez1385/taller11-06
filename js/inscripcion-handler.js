@@ -1,5 +1,5 @@
 (function () {
-  const DEBUG = false;
+  const DEBUG = true;
   const log = (...args) => DEBUG && console.log(...args);
   const logError = (...args) => console.error(...args);
 
@@ -84,12 +84,41 @@
         return data;
       } catch (error) {
         logError("Error fetching user data:", error);
-        throw error;
+        return null;
       }
     };
 
    // Update the showEnrollmentModal function
-const showEnrollmentModal = (courseId) => { 
+const showEnrollmentModal = async (courseId) => {
+    try {
+        log("Checking if user is logged in for course:", courseId);
+        
+        // Simple check: try to get user data
+        const userData = await getUserData();
+        
+        if (!userData) {
+            // User not logged in: show message then redirect
+            showError('Debes crear una cuenta o iniciar sesión para inscribirte. Serás redirigido al inicio de sesión...');
+            setTimeout(() => {
+                window.location.href = '/login/login.php';
+            }, 1200);
+            return;
+        }
+        
+        // User is logged in, check if profile is complete for 'user' type
+        if (userData.tipo_usuario === 'user' && userData.perfil_incompleto) {
+            log("User profile incomplete, redirecting to profile");
+            showError("Debes completar tu perfil antes de inscribirte. <a href='/models/perfil/perfil.php' style='color:#fff;text-decoration:underline;'>Completa tu perfil aquí</a>.");
+            return;
+        }
+        
+        log("User validation successful, showing modal");
+    } catch (err) {
+        logError("Error checking user status:", err);
+        // If there's an error, assume user is not logged in
+        window.location.href = '/login/login.php';
+        return;
+    }
   const modalHTML = `
   <div class="tw-fixed tw-inset-0 tw-bg-gray-600 tw-bg-opacity-50 tw-overflow-y-auto tw-h-full tw-w-full" id="inscripcionModal">
       <div style="top: 50%; transform: translateY(-50%);" class="tw-relative tw-mx-auto tw-p-5 tw-border tw-w-96 tw-shadow-lg tw-rounded-md tw-bg-white">
@@ -319,6 +348,22 @@ const showEnrollmentModal = (courseId) => {
       showLoading();
 
       try {
+        // Simple check: try to get user data
+        const userData = await getUserData();
+        
+        if (!userData) {
+            // User not logged in, redirect to register
+            hideLoading();
+            window.location.href = '/login/login.php';
+            return;
+        }
+        
+        // User is logged in, check if profile is complete for 'user' type
+        if (userData.tipo_usuario === 'user' && userData.perfil_incompleto) {
+            hideLoading();
+            showError("Debes completar tu perfil antes de inscribirte. <a href='/models/perfil/perfil.php' style='color:#fff;text-decoration:underline;'>Completa tu perfil aquí</a>.");
+            return;
+        }
         const response = await fetch("/scripts/verificar_usuario.php", {
           method: "POST",
           headers: {
@@ -373,14 +418,14 @@ const showEnrollmentModal = (courseId) => {
         );
 
         enrollmentBtns.forEach((btn) => {
-            btn.addEventListener("click", (e) => {
+            btn.addEventListener("click", async (e) => {
                 e.preventDefault();
                 const courseId = btn.getAttribute("data-curso-id");
                 if (courseId) {
                     if (btn.classList.contains("inscribirse-btn")) {
-                        showEnrollmentModal(courseId);
+                        await showEnrollmentModal(courseId);
                     } else if (btn.classList.contains("inscripcion-completa-btn")) {
-                        fullEnrollment(courseId);
+                        await fullEnrollment(courseId);
                     }
                 } else {
                     showError("No se pudo obtener el ID del curso.");

@@ -19,6 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     $query = "UPDATE usuario SET nombre = ?, apellido = ?, mail = ?, telefono = ?, direccion = ?, fecha_nac = ?, perfil_incompleto = ? WHERE id_usuario = ?";
     $stmt = $conn->prepare($query);
+    if (!$stmt) {
+        echo json_encode(['success' => false, 'message' => 'Error en prepare: ' . $conn->error]);
+        $conn->close();
+        exit;
+    }
     $perfil_incompleto = $perfil_completo ? 0 : 1; // 0 si está completo, 1 si está incompleto
     $stmt->bind_param("ssssssii", $nombre, $apellido, $mail, $telefono, $direccion, $fecha_nac, $perfil_incompleto, $id_usuario);
 

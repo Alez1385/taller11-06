@@ -333,7 +333,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
 // Código original para manejar POST requests
 function isAuthenticated() {
-    return isset($_SESSION['username']);
+    return isset($_SESSION['id_usuario']);
 }
 
 function createNewUser($conn, $nombre, $email, $telefono) {
@@ -462,11 +462,9 @@ try {
     ]);
 
 } catch (Exception $e) {
-    
-        error_log("Error in preinscribir.php: " . $e->getMessage());
-        // Retorna el mensaje de error específico
-        echo json_encode(["error" => "Interal server error"]);
-    
+    error_log("Error in preinscribir.php: " . $e->getMessage());
+    // Retorna el mensaje de error específico
+    echo json_encode(["error" => "Error interno del servidor: " . $e->getMessage()]);
 } finally {
     if (isset($stmt)) {
         $stmt->close();

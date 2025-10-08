@@ -7,7 +7,7 @@ session_start();
 include 'conexion.php';
 
 function getUserDataFromDatabase($userId, $conn) {
-    $query = "SELECT nombre, apellido, mail, telefono FROM usuario WHERE id_usuario = ? AND estado = 'activo'";
+    $query = "SELECT nombre, apellido, mail, telefono, perfil_incompleto, id_tipo_usuario FROM usuario WHERE id_usuario = ? AND estado = 'activo'";
     $stmt = $conn->prepare($query);
     $stmt->bind_param("i", $userId);
     $stmt->execute();
@@ -34,7 +34,9 @@ if (isset($_SESSION['username'])) {
                 $responseData = [
                     'nombre' => $userData['nombre'] . ' ' . $userData['apellido'],
                     'email' => $userData['mail'],
-                    'telefono' => $userData['telefono']
+                    'telefono' => $userData['telefono'],
+                    'perfil_incompleto' => $userData['perfil_incompleto'],
+                    'id_tipo_usuario' => $userData['id_tipo_usuario']
                 ];
                 header('Content-Type: application/json');
                 echo json_encode($responseData);

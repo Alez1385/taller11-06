@@ -419,8 +419,7 @@ function safe_json_response($data) {
                     $stmt_del_all->execute();
                 }
                 // Crear la inscripción formal como aprobada
-                    $insert_inscripcion = "INSERT INTO inscripciones (id_curso, id_estudiante, fecha_inscripcion, estado) 
-                                         VALUES (?, ?, CURDATE(), 'aprobada')";
+                    $insert_inscripcion = "INSERT INTO inscripciones (id_curso, id_estudiante, fecha_inscripcion, estado) VALUES (?, ?, CURDATE(), 'aprobada')";
                     $stmt_inscripcion = $conn->prepare($insert_inscripcion);
                 if (!$stmt_inscripcion) {
                     $sql_error = $conn->error;
@@ -430,6 +429,24 @@ function safe_json_response($data) {
                 }
                     $stmt_inscripcion->bind_param("ii", $pre['id_curso'], $id_estudiante);
                     $stmt_inscripcion->execute();
+                // Refuerzo: Cambiar SIEMPRE el tipo de usuario a estudiante (3) al aprobar la inscripción formal
+                if ($pre['id_usuario']) {
+                    $sql_user = "UPDATE usuario SET id_tipo_usuario = 3 WHERE id_usuario = ?";
+                    $stmt_user = $conn->prepare($sql_user);
+                    if ($stmt_user) {
+                        $stmt_user->bind_param("i", $pre['id_usuario']);
+                        if (!$stmt_user->execute()) {
+                            error_log('No se pudo actualizar el tipo de usuario a estudiante para id_usuario=' . $pre['id_usuario']);
+                        } else {
+                            if (isset($_SESSION['id_usuario']) && $_SESSION['id_usuario'] == $pre['id_usuario']) {
+                                $_SESSION['id_tipo_usuario'] = 3;
+                                $_SESSION['user_role'] = 'estudiante';
+                            }
+                        }
+                    } else {
+                        error_log('No se pudo preparar el UPDATE para tipo estudiante: ' . $conn->error);
+                    }
+                }
                 if ($stmt_inscripcion->affected_rows === 0) {
                     $conn->rollback();
                     echo json_encode(['success'=>false, 'message'=>'Error: No se pudo crear la inscripción formal. Por favor, revisa la base de datos.']);
@@ -705,40 +722,120 @@ if (isset($_POST['rechazar_preinscripcion']) && isset($_POST['id_preinscripcion'
                 $stmt_del_all_insc->execute();
             }
         }
-        // Eliminar todas las preinscripciones previas para ese usuario/email y curso
-        if ($pre['id_usuario']) {
-            $sql_del_all = "DELETE FROM preinscripciones WHERE (id_usuario = ? OR email = ?) AND id_curso = ?";
-            $stmt_del_all = $conn->prepare($sql_del_all);
-            if (!$stmt_del_all) {
-                $sql_error = $conn->error;
-                error_log('SQL prepare error: ' . $sql_error . ' | SQL: ' . $sql_del_all);
-                safe_json_response(['success'=>false,'message'=>'Error SQL prepare: ' . $sql_error . ' | SQL: ' . $sql_del_all]);
-                exit;
+        // Refuerzo: Asegurar que SIEMPRE exista un registro activo en estudiante y actualizar tipo de usuario
+        if ($insc['id_usuario'] && $nuevo_estado == 'aprobada') {
+            // Buscar estudiante activo o inactivo
+            $sql_check_est = "SELECT id_estudiante, estado FROM estudiante WHERE id_usuario = ? ORDER BY id_estudiante ASC LIMIT 1";
+            $stmt_check_est = $conn->prepare($sql_check_est);
+            $stmt_check_est->bind_param("i", $insc['id_usuario']);
+            $stmt_check_est->execute();
+            $res_check_est = $stmt_check_est->get_result();
+            if ($res_check_est && $row_est = $res_check_est->fetch_assoc()) {
+                if ($row_est['estado'] != 'activo') {
+                    // Reactivar estudiante
+                    $sql_react = "UPDATE estudiante SET estado = 'activo' WHERE id_estudiante = ?";
+                    $stmt_react = $conn->prepare($sql_react);
+                    $stmt_react->bind_param("i", $row_est['id_estudiante']);
+                    $stmt_react->execute();
+                    $stmt_react->close();
+                }
+            } else {
+                // Crear estudiante si no existe
+                $sql_new_est = "INSERT INTO estudiante (id_usuario, fecha_registro, estado) VALUES (?, CURDATE(), 'activo')";
+                $stmt_new_est = $conn->prepare($sql_new_est);
+                $stmt_new_est->bind_param("i", $insc['id_usuario']);
+                $stmt_new_est->execute();
+                $stmt_new_est->close();
             }
-            $stmt_del_all->bind_param("isi", $pre['id_usuario'], $pre['email'], $pre['id_curso']);
-            $stmt_del_all->execute();
-        } else {
-            $sql_del_all = "DELETE FROM preinscripciones WHERE email = ? AND id_curso = ?";
-            $stmt_del_all = $conn->prepare($sql_del_all);
-            if (!$stmt_del_all) {
-                $sql_error = $conn->error;
-                error_log('SQL prepare error: ' . $sql_error . ' | SQL: ' . $sql_del_all);
-                safe_json_response(['success'=>false,'message'=>'Error SQL prepare: ' . $sql_error . ' | SQL: ' . $sql_del_all]);
-                exit;
+            $stmt_check_est->close();
+            // Refuerzo: Si el usuario tiene inscripción aprobada y registro en estudiante, fuerza el tipo a estudiante
+            $sql_check_aprob = "SELECT COUNT(*) as total FROM inscripciones i INNER JOIN estudiante e ON i.id_estudiante = e.id_estudiante WHERE e.id_usuario = ? AND i.estado = 'aprobada'";
+            $stmt_check_aprob = $conn->prepare($sql_check_aprob);
+            $stmt_check_aprob->bind_param("i", $insc['id_usuario']);
+            $stmt_check_aprob->execute();
+            $res_check_aprob = $stmt_check_aprob->get_result();
+            $total_aprob = 0;
+            if ($res_check_aprob && $row_aprob = $res_check_aprob->fetch_assoc()) {
+                $total_aprob = $row_aprob['total'];
             }
-            $stmt_del_all->bind_param("si", $pre['email'], $pre['id_curso']);
-            $stmt_del_all->execute();
+            $stmt_check_aprob->close();
+            if ($total_aprob > 0) {
+                $sql_user = "UPDATE usuario SET id_tipo_usuario = 3 WHERE id_usuario = ?";
+                $stmt_user = $conn->prepare($sql_user);
+                if ($stmt_user) {
+                    $stmt_user->bind_param("i", $insc['id_usuario']);
+                    $stmt_user->execute();
+                    $affected = $stmt_user->affected_rows;
+                    // Log y debug visual
+                    error_log('DEBUG: UPDATE usuario SET id_tipo_usuario = 3 WHERE id_usuario = ' . $insc['id_usuario'] . ' | Filas afectadas: ' . $affected);
+                    $sql_check = "SELECT id_tipo_usuario FROM usuario WHERE id_usuario = ?";
+                    $stmt_check = $conn->prepare($sql_check);
+                    $stmt_check->bind_param("i", $insc['id_usuario']);
+                    $stmt_check->execute();
+                    $stmt_check->bind_result($tipo_final);
+                    $stmt_check->fetch();
+                    $stmt_check->close();
+                    error_log('DEBUG: Valor final id_tipo_usuario para id_usuario=' . $insc['id_usuario'] . ' es ' . $tipo_final);
+                    if (isset($_SESSION['id_usuario']) && $_SESSION['id_usuario'] == $insc['id_usuario']) {
+                        $_SESSION['id_tipo_usuario'] = 3;
+                        $_SESSION['user_role'] = 'estudiante';
+                    }
+                    $stmt_user->close();
+                    // Debug visual (ahora también en JSON)
+                    $debug_msg = 'DEBUG: UPDATE usuario SET id_tipo_usuario = 3 WHERE id_usuario = ' . $insc['id_usuario'] . ' | Filas afectadas: ' . $affected . ' | Valor final en BD: ' . $tipo_final;
+                    error_log($debug_msg);
+                    if (isset($json_debug_msgs)) {
+                        $json_debug_msgs[] = $debug_msg;
+                    } else {
+                        $json_debug_msgs = [$debug_msg];
+                    }
+                } else {
+                    $conn->rollback();
+                    safe_json_response(['success'=>false,'message'=>'Error: No se pudo preparar el UPDATE para tipo estudiante: ' . $conn->error]);
+                }
+            }
         }
         // --- Fin lógica tipo usuario ---
     }
     if ($success) {
-        echo json_encode(['success'=>true, 'message'=>'Preinscripción rechazada correctamente.']);
+        $resp = ['success'=>true, 'message'=>'Preinscripción rechazada correctamente.'];
+        if (isset($json_debug_msgs)) $resp['debug'] = $json_debug_msgs;
+        echo json_encode($resp);
     } else {
-        echo json_encode(['success'=>false, 'message'=>'Error al rechazar la preinscripción.']);
+        $resp = ['success'=>false, 'message'=>'Error al rechazar la preinscripción.'];
+        if (isset($json_debug_msgs)) $resp['debug'] = $json_debug_msgs;
+        echo json_encode($resp);
     }
     exit;
 }
 // --- FIN BLOQUE PHP ---
+
+// =====================
+// REPARACIÓN DE USUARIOS: Cambia a estudiante a todos los usuarios con inscripción aprobada y registro en estudiante
+// Ejecutar manualmente accediendo a models/inscripciones/inscripciones.php?fix_estudiantes=1 (solo admin)
+if (isset($_GET['fix_estudiantes']) && $_GET['fix_estudiantes'] == 1) {
+    require_once __DIR__ . '/../../scripts/conexion.php';
+    $sql = "SELECT u.id_usuario
+            FROM usuario u
+            JOIN estudiante e ON u.id_usuario = e.id_usuario
+            JOIN inscripciones i ON e.id_estudiante = i.id_estudiante
+            WHERE u.id_tipo_usuario = 4
+              AND e.estado = 'activo'
+              AND i.estado = 'aprobada'
+            GROUP BY u.id_usuario";
+    $res = $conn->query($sql);
+    $cambiados = 0;
+    while ($row = $res->fetch_assoc()) {
+        $upd = $conn->prepare("UPDATE usuario SET id_tipo_usuario = 3 WHERE id_usuario = ?");
+        $upd->bind_param("i", $row['id_usuario']);
+        if ($upd->execute()) {
+            $cambiados++;
+        }
+        $upd->close();
+    }
+    echo "<h2>Usuarios reparados: $cambiados</h2>";
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">

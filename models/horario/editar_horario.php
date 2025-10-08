@@ -22,9 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $hora_inicio = $_POST["hora_inicio"][$dia];
             $hora_fin = $_POST["hora_fin"][$dia];
             
-            // Validar que las horas estén dentro del rango permitido
-            if (strtotime($hora_inicio) < strtotime('06:00') || strtotime($hora_fin) > strtotime('20:00')) {
-                $error = "Las horas deben estar entre las 6:00 AM y las 8:00 PM para el día " . ucfirst($dia) . ".";
+            // Validar que las horas estén dentro del rango permitido (6:00 AM - 2:00 PM)
+            if (strtotime($hora_inicio) < strtotime('06:00') || strtotime($hora_fin) > strtotime('14:00')) {
+                $error = "Las horas deben estar entre las 6:00 AM y las 2:00 PM para el día " . ucfirst($dia) . ".";
                 break;
             }
             
@@ -101,7 +101,7 @@ if (!$horario) {
 
             <section class="content">
                 <?php if (isset($error)) echo "<p class='error'>$error</p>"; ?>
-                <p><strong>Nota:</strong> Los horarios deben estar entre las 6:00 AM y las 8:00 PM.</p>
+                <p><strong>Nota:</strong> Los horarios deben estar entre las 6:00 AM y las 2:00 PM.</p>
                 <form id="editarHorarioForm" method="POST">
                     <div class="form-group">
                         <label for="curso">Curso:</label>
@@ -137,8 +137,8 @@ if (!$horario) {
                             $horario_dia = isset($horario[$dia]) ? explode(' - ', $horario[$dia]) : ['', ''];
                             echo "<div class='dia-horario'>";
                             echo "<label>" . ucfirst($dia) . ":</label>";
-                            echo "<input type='time' name='hora_inicio[$dia]' value='" . htmlspecialchars($horario_dia[0]) . "' min='06:00' max='20:00'>";
-                            echo "<input type='time' name='hora_fin[$dia]' value='" . htmlspecialchars($horario_dia[1]) . "' min='06:00' max='20:00'>";
+                            echo "<input type='time' name='hora_inicio[$dia]' value='" . htmlspecialchars($horario_dia[0]) . "' min='06:00' max='14:00'>";
+                            echo "<input type='time' name='hora_fin[$dia]' value='" . htmlspecialchars($horario_dia[1]) . "' min='06:00' max='14:00'>";
                             echo "<div class='error-message' id='error_$dia'></div>";
                             echo "</div>";
                         }
@@ -165,8 +165,8 @@ if (!$horario) {
                     const horaFin = document.querySelector(`input[name="hora_fin[${dia}]"]`).value;
                     if (horaInicio && horaFin) {
                         // Validar rango de horas
-                        if (horaInicio < "06:00" || horaFin > "20:00") {
-                            document.getElementById(`error_${dia}`).textContent = 'Las horas deben estar entre las 6:00 AM y las 8:00 PM.';
+                        if (horaInicio < "06:00" || horaFin > "14:00") {
+                            document.getElementById(`error_${dia}`).textContent = 'Las horas deben estar entre las 6:00 AM y las 2:00 PM.';
                             document.getElementById(`error_${dia}`).style.display = 'block';
                             formValido = false;
                             return Promise.resolve();

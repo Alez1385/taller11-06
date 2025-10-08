@@ -75,7 +75,7 @@
 
 .btn-back {
     padding: 6px 12px;
-    background-color: #6c757d;
+    background-color: #f8f9fa;
     color: #fff;
     border: none;
     border-radius: 5px;
@@ -104,7 +104,7 @@
 
 .mensaje.exito {
     background-color: #d4edda;
-    color: #155724;
+    color: #ffffff;
     padding: 10px;
     border-radius: 5px;
     margin-bottom: 20px;
@@ -198,7 +198,7 @@
     display: inline-flex;
     align-items: center;
     padding: 8px 15px;
-    background-color: #6c757d;
+    background-color: #f8f9fa;
     color: #fff;
     border: none;
     border-radius: 5px;

@@ -255,8 +255,12 @@ const dashboardUpdater = {
                           </div>
                           <div class="course-actions">
                               ${
-                                curso.estado_inscripcion === null &&
-                                curso.estado_preinscripcion === null
+                                (curso.estado_inscripcion === null || 
+                                 curso.estado_inscripcion === 'rechazada' || 
+                                 curso.estado_inscripcion === 'cancelada') &&
+                                (curso.estado_preinscripcion === null || 
+                                 curso.estado_preinscripcion === 'rechazada' || 
+                                 curso.estado_preinscripcion === 'cancelada')
                                   ? `<button id="inscripcion-modal " class="inscripcion-open-btn inscribirse-btn" data-curso-id="${curso.id_curso}">Inscribirse</button>`
                                   : ""
                               }

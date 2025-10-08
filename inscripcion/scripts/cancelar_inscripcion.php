@@ -42,7 +42,7 @@ try {
     }
 
     // Actualizar el estado de la inscripción a 'cancelado'
-    $stmt = $pdo->prepare("DELETE FROM inscripciones WHERE id_inscripcion = ?");
+    $stmt = $pdo->prepare("UPDATE inscripciones SET estado = 'cancelada', fecha_actualizacion = NOW() WHERE id_inscripcion = ?");
     $stmt->execute([$id_inscripcion]);
 
     echo json_encode(['success' => true, 'message' => 'Inscripción cancelada exitosamente']);

@@ -95,6 +95,10 @@ p {
     color: var(--color-dark-variant);
 }
 
+
+.asistencia_color_text {
+    color: white !important;
+}
 b {
     color: var(--color-dark);
 }
@@ -399,6 +403,116 @@ aside {
 
 
 
+/* Modern Profile Section - Horizontal Layout */
+.profile-section {
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.profile-card {
+    background: white;
+    border-radius: var(--border-radius-1);
+    padding: 0.75rem;
+    color: var(--color-dark);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.profile-photo-container {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.profile-photo {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.profile-photo-placeholder {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.profile-photo-placeholder i {
+    font-size: 1.5rem;
+    color: white;
+}
+
+.profile-warning-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background: var(--color-warning);
+    color: white;
+    border-radius: 50%;
+    width: 1.2rem;
+    height: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    z-index: 3;
+}
+
+.profile-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.profile-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin: 0 0 0.1rem 0;
+    color: var(--color-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.profile-role {
+    font-size: 0.75rem;
+    margin: 0 0 0.25rem 0;
+    color: var(--color-info-dark);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.profile-incomplete-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--color-warning);
+    padding: 0.15rem 0.3rem;
+    border-radius: 8px;
+    font-size: 0.6rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+    border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.profile-incomplete-warning i {
+    font-size: 0.7rem;
+}
+
+/* Legacy profile styles for backward compatibility */
 .profile {
     display: flex;
     gap: 2rem;

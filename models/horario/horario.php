@@ -10,29 +10,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $id_profesor = $_POST['profesor'];
     $dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
     
-    // Verificar si el curso ya tiene un horario asignado
-    $sql_check = "SELECT id_horario FROM horarios WHERE id_curso = ?";
-    $stmt_check = $conn->prepare($sql_check);
-    $stmt_check->bind_param("i", $id_curso);
-    $stmt_check->execute();
-    $result_check = $stmt_check->get_result();
-    
-    if ($result_check->num_rows > 0) {
-        $error = "Este curso ya tiene un horario asignado.";
-    } else {
+    // Limpiar cualquier horario previo del curso antes de crear uno nuevo
+    $stmt_cleanup = $conn->prepare("DELETE FROM horarios WHERE id_curso = ?");
+    $stmt_cleanup->bind_param("i", $id_curso);
+    $stmt_cleanup->execute();
+    $stmt_cleanup->close();
+
+    {
         $horarios = array_fill(0, 6, null);
         $conflicto = false;
         $error = "";
         
+        $horas_semanales_nuevas = 0;
         foreach ($dias as $index => $dia) {
             if (!empty($_POST["hora_inicio"][$dia]) && !empty($_POST["hora_fin"][$dia])) {
                 $hora_inicio = $_POST["hora_inicio"][$dia];
                 $hora_fin = $_POST["hora_fin"][$dia];
                 
-                // Validar que las horas estén dentro del rango permitido
-                if (strtotime($hora_inicio) < strtotime('06:00') || strtotime($hora_fin) > strtotime('20:00')) {
+                // Validar que las horas estén dentro del rango permitido (6:00 AM - 2:00 PM)
+                if (strtotime($hora_inicio) < strtotime('06:00') || strtotime($hora_fin) > strtotime('14:00')) {
                     $conflicto = true;
-                    $error = "Las horas deben estar entre las 6:00 AM y las 8:00 PM para el día " . ucfirst($dia) . ".";
+                    $error = "Las horas deben estar entre las 6:00 AM y las 2:00 PM para el día " . ucfirst($dia) . ".";
                     break;
                 }
                 
@@ -44,6 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
                 
                 $horarios[$index] = $hora_inicio . " - " . $hora_fin;
+
+                // Acumular horas (bloques de 1h)
+                $horas_semanales_nuevas += max(0, (strtotime($hora_fin) - strtotime($hora_inicio)) / 3600);
                 
                 // Verificar conflicto de horarios
                 $sql = "SELECT * FROM horarios WHERE id_profesor = ? AND $dia IS NOT NULL";
@@ -65,6 +66,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
         
+        // Calcular horas actuales ya asignadas al profesor esta semana en otros cursos
+        if (!$conflicto) {
+            $sql_horas = "SELECT lunes, martes, miercoles, jueves, viernes, sabado FROM horarios WHERE id_profesor = ?";
+            $stmt_horas = $conn->prepare($sql_horas);
+            $stmt_horas->bind_param("i", $id_profesor);
+            $stmt_horas->execute();
+            $res_horas = $stmt_horas->get_result();
+            $horas_asignadas_actuales = 0;
+            while ($row = $res_horas->fetch_assoc()) {
+                foreach ($dias as $d) {
+                    if (!empty($row[$d])) {
+                        list($hi, $hf) = explode(' - ', $row[$d]);
+                        $horas_asignadas_actuales += max(0, (strtotime($hf) - strtotime($hi)) / 3600);
+                    }
+                }
+            }
+            $stmt_horas->close();
+
+            if (($horas_asignadas_actuales + $horas_semanales_nuevas) > 8) {
+                $conflicto = true;
+                $error = "Este profesor excede el máximo de 8 horas semanales con este horario.";
+            }
+        }
+
         if (!$conflicto) {
             $sql = "INSERT INTO horarios (id_curso, id_profesor, lunes, martes, miercoles, jueves, viernes, sabado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
@@ -106,7 +131,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             <section class="content">
                 <h2>Asignación de Horarios</h2>
-                <p><strong>Nota:</strong> Los horarios deben estar entre las 6:00 AM y las 8:00 PM.</p>
+                <p><strong>Nota:</strong> Los horarios deben estar entre las 6:00 AM y las 2:00 PM.</p>
                 
                 <?php if (isset($error)): ?>
                     <div class="error-message"><?php echo $error; ?></div>
@@ -149,13 +174,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         foreach ($dias as $dia) {
                             echo "<div class='dia-horario'>";
                             echo "<label>" . ucfirst($dia) . ":</label>";
-                            echo "<input type='time' name='hora_inicio[$dia]' min='06:00' max='20:00'>";
-                            echo "<input type='time' name='hora_fin[$dia]' min='06:00' max='20:00'>";
+                            echo "<input type='time' name='hora_inicio[$dia]' min='06:00' max='14:00'>";
+                            echo "<input type='time' name='hora_fin[$dia]' min='06:00' max='14:00'>";
                             echo "</div>";
                         }
                         ?>
                     </div>
-                    <button type="submit" class="btn-submit">Crear Horario</button>
+                    <div class="form-actions">
+                        <button type="button" id="asignarAleatorio" class="btn-random">Asignar Horario Aleatorio</button>
+                        <button type="submit" class="btn-submit">Crear Horario</button>
+                    </div>
                 </form>
             </section>
         </div>
@@ -165,15 +193,63 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     document.addEventListener('DOMContentLoaded', function() {
         const profesorSelect = document.getElementById('profesor');
         const dias = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-        const submitButton = document.getElementById('submitButton');
+        const submitButton = document.querySelector('.btn-submit');
+        const asignarAleatorioBtn = document.getElementById('asignarAleatorio');
         let formValido = true;
+
+        // Función para generar horarios aleatorios
+        function generarHorarioAleatorio() {
+            const cursoSelect = document.getElementById('curso');
+            const profesorSelect = document.getElementById('profesor');
+            
+            if (!cursoSelect.value || !profesorSelect.value) {
+                alert('Por favor seleccione un curso y un profesor primero');
+                return;
+            }
+            
+            // Mostrar indicador de carga
+            asignarAleatorioBtn.disabled = true;
+            asignarAleatorioBtn.textContent = 'Asignando...';
+            
+            // Llamar al endpoint de asignación aleatoria
+            fetch('asignar_horario_aleatorio.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `id_curso=${cursoSelect.value}&id_profesor=${profesorSelect.value}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Horario aleatorio asignado exitosamente');
+                    // Recargar la página para mostrar el nuevo horario
+                    window.location.href = 'horarios_asignados.php';
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ocurrió un error al asignar el horario aleatorio');
+            })
+            .finally(() => {
+                asignarAleatorioBtn.disabled = false;
+                asignarAleatorioBtn.textContent = 'Asignar Horario Aleatorio';
+            });
+        }
 
         function verificarDisponibilidad() {
             const idProfesor = profesorSelect.value;
+            if (!idProfesor) {
+                alert('Por favor seleccione un profesor primero');
+                return;
+            }
+            
+            formValido = true;
             const promesas = dias.map(dia => {
                 const horaInicio = document.querySelector(`input[name="hora_inicio[${dia}]"]`).value;
                 const horaFin = document.querySelector(`input[name="hora_fin[${dia}]"]`).value;
-                const errorElement = document.getElementById(`error_${dia}`);
 
                 if (horaInicio && horaFin) {
                     return fetch('verificar_disponibilidad.php', {
@@ -185,28 +261,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     })
                     .then(response => response.json())
                     .then(data => {
-                        if (data.disponible) {
-                            errorElement.textContent = '';
-                            errorElement.style.display = 'none';
-                        } else {
-                            errorElement.textContent = 'El profesor ya tiene un horario asignado que se superpone en este período.';
-                            errorElement.style.display = 'block';
+                        if (!data.disponible) {
                             formValido = false;
+                            if (data.error) {
+                                alert(`Error en ${dia}: ${data.error}`);
+                            } else {
+                                alert(`Conflicto de horario en ${dia}: El profesor ya tiene un horario asignado en este período.`);
+                            }
                         }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        formValido = false;
                     });
                 }
                 return Promise.resolve();
             });
 
             Promise.all(promesas).then(() => {
-                submitButton.disabled = !formValido;
+                if (submitButton) {
+                    submitButton.disabled = !formValido;
+                }
             });
         }
 
+        // Event listeners
         profesorSelect.addEventListener('change', verificarDisponibilidad);
         dias.forEach(dia => {
             document.querySelector(`input[name="hora_inicio[${dia}]"]`).addEventListener('change', verificarDisponibilidad);
             document.querySelector(`input[name="hora_fin[${dia}]"]`).addEventListener('change', verificarDisponibilidad);
+        });
+        
+        asignarAleatorioBtn.addEventListener('click', function() {
+            if (!profesorSelect.value) {
+                alert('Por favor seleccione un profesor primero');
+                return;
+            }
+            generarHorarioAleatorio();
+        });
+
+        // Prevenir envío del formulario si no es válido
+        document.getElementById('horarioForm').addEventListener('submit', function(event) {
+            verificarDisponibilidad();
+            if (!formValido) {
+                event.preventDefault();
+                alert('Por favor, corrija los horarios en conflicto antes de crear el horario.');
+            }
         });
     });
     </script>

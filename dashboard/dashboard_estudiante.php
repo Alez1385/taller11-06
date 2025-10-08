@@ -8,6 +8,11 @@ if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
 
+// Obtener el tipo de usuario SIEMPRE desde la base de datos
+$user = getUserInfo($conn, $_SESSION['id_usuario']);
+$_SESSION['id_tipo_usuario'] = $user['id_tipo_usuario'];
+$_SESSION['user_role'] = $user['tipo_nombre'];
+
 // Check if the user is logged in and is a student
 if (!isset($_SESSION['username']) || !checkPermission('estudiante')) {
     echo '<h2 class="no-tienes-permiso">No tienes permiso para acceder a esta página.</h2>';
@@ -88,7 +93,75 @@ document.addEventListener('DOMContentLoaded', function() {
 <section class="student-dashboard">
     <!-- Div para mostrar errores -->
     <div id="error-message" style="display:none;"></div>
-    <h2>Mis Inscripciones</h2>
+    <h2>Mi Horario</h2>
+    <?php
+    // Renderizar una grilla de horario como en horario_estudiante
+    require_once '../scripts/conexion.php';
+    $id_usuario_tmp = $_SESSION['id_usuario'];
+    $stmt_est_dash = $conn->prepare("SELECT id_estudiante FROM estudiante WHERE id_usuario = ?");
+    if ($stmt_est_dash) {
+        $stmt_est_dash->bind_param("i", $id_usuario_tmp);
+        $stmt_est_dash->execute();
+        $res_est_dash = $stmt_est_dash->get_result();
+        $row_est_dash = $res_est_dash->fetch_assoc();
+        if ($row_est_dash) {
+            $id_est_dash = $row_est_dash['id_estudiante'];
+            $sql_dash = "SELECT h.id_horario, c.nombre_curso, c.descripcion,
+                                 h.lunes, h.martes, h.miercoles, h.jueves, h.viernes, h.sabado
+                          FROM inscripciones i
+                          JOIN cursos c ON i.id_curso = c.id_curso
+                          JOIN horarios h ON h.id_curso = c.id_curso
+                          WHERE i.id_estudiante = ? AND i.estado = 'aprobada'
+                            AND h.id_horario IN (
+                                SELECT MAX(h2.id_horario) FROM horarios h2 WHERE h2.id_curso = c.id_curso
+                            )";
+            $stmt_dash = $conn->prepare($sql_dash);
+            if ($stmt_dash) {
+                $stmt_dash->bind_param("i", $id_est_dash);
+                $stmt_dash->execute();
+                $res_dash = $stmt_dash->get_result();
+                $horarios_dash = $res_dash->fetch_all(MYSQLI_ASSOC);
+                echo '<div class="horario-container" style="background:#fff;border-radius:10px;padding:10px;margin-bottom:20px;"><table style="width:100%;border-collapse:collapse;">';
+                echo '<thead><tr>';
+                echo '<th style="background:#00bcff;color:#fff;padding:8px;">Hora</th>';
+                $dias_lbl = ['Lunes'=>'lunes','Martes'=>'martes','Miércoles'=>'miercoles','Jueves'=>'jueves','Viernes'=>'viernes','Sábado'=>'sabado'];
+                foreach ($dias_lbl as $dLabel => $dKey) {
+                    echo '<th style="background:#00bcff;color:#fff;padding:8px;">'.$dLabel.'</th>';
+                }
+                echo '</tr></thead><tbody>';
+                $horas_tmp = [];
+                for ($i = 6; $i <= 14; $i++) { $horas_tmp[] = sprintf("%02d:00", $i); }
+                foreach ($horas_tmp as $hora_tmp) {
+                    echo '<tr>';
+                    echo '<td style="background:#f8f9fa;font-weight:600;padding:6px;border:1px solid #e9ecef;">'.date('h:i A', strtotime($hora_tmp)).'</td>';
+                    foreach ($dias_lbl as $dKey) {
+                        echo '<td style="padding:6px;border:1px solid #e9ecef;">';
+                        $found = false;
+                        foreach ($horarios_dash as $h) {
+                            if (!empty($h[$dKey])) {
+                                list($ini,$fin) = explode(' - ',$h[$dKey]);
+                                $ha = strtotime($hora_tmp);
+                                $hs = strtotime('+1 hour',$ha);
+                                $hi = strtotime($ini); $hf = strtotime($fin);
+                                if (($ha >= $hi && $ha < $hf) || ($hs > $hi && $hs <= $hf) || ($ha <= $hi && $hs >= $hf)) {
+                                    echo '<div style="background:linear-gradient(135deg,#e3f2fd,#bbdefb);padding:6px;border-left:3px solid #1e3a8a;border-radius:6px;">';
+                                    echo '<div style="font-weight:700;color:#1e3a8a;">'.htmlspecialchars($h['nombre_curso']).'</div>';
+                                    echo '<div style="font-size:12px;color:#6c757d;">'.date('h:i A',$hi).' - '.date('h:i A',$hf).'</div>';
+                                    echo '</div>';
+                                    $found = true; break;
+                                }
+                            }
+                        }
+                        if (!$found) { echo '<div style="color:#adb5bd;">-</div>'; }
+                        echo '</td>';
+                    }
+                    echo '</tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+        }
+    }
+    ?>
     <div id="inscripciones-list" class="inscripciones-list">
         <!-- Inscripciones will be dynamically inserted here -->
     </div>

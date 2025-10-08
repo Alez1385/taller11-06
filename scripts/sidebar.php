@@ -60,6 +60,10 @@ try {
     $isUserTypeUser = ($user['tipo_nombre'] === 'user');
     $id_tipo_usuario = $_SESSION['id_tipo_usuario'] ?? null;
 
+    // Get profile completion status
+    $profileInfo = getProfileIncompleteInfo($user);
+    $isProfileIncomplete = $profileInfo['incompleto'];
+
     // Get saved order and reorder modules
     $savedOrder = getSavedModuleOrder($conn, $_SESSION['id_usuario']);
     if (!empty($savedOrder) && is_array($savedOrder)) {
@@ -97,16 +101,33 @@ try {
 <body>
     <aside>
         <div class="sidebar">
-            <div class="profile">
-                <div class="info">
-                    <p><b><?php echo htmlspecialchars($user['nombre'] ?: $user['username']); ?></b></p>
-                </div>
-                <div class="profile-photo">
-                    <?php if (!empty($user['foto']) && file_exists(__DIR__ . '/../uploads/' . $user['foto'])): ?>
-                        <img src="<?php echo BASE_URL . 'uploads/' . htmlspecialchars($user['foto']); ?>" alt="User Image">
-                    <?php else: ?>
-                        <i class="fas fa-user-circle user-icon" style="font-size: 60px; color: #ccc;"></i>
-                    <?php endif; ?>
+            <!-- Modern Profile Section -->
+            <div class="profile-section">
+                <div class="profile-card">
+                    <div class="profile-photo-container">
+                        <?php if (!empty($user['foto']) && file_exists(__DIR__ . '/../uploads/' . $user['foto'])): ?>
+                            <img src="<?php echo BASE_URL . 'uploads/' . htmlspecialchars($user['foto']); ?>" alt="User Image" class="profile-photo">
+                        <?php else: ?>
+                            <div class="profile-photo-placeholder">
+                                <i class="material-icons-sharp">person</i>
+                            </div>
+                        <?php endif; ?>
+                        <?php if ($isProfileIncomplete): ?>
+                            <div class="profile-warning-badge" title="Perfil incompleto">
+                                <i class="material-icons-sharp">warning</i>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="profile-info">
+                        <h3 class="profile-name"><?php echo htmlspecialchars($user['nombre'] ?: $user['username']); ?></h3>
+                        <p class="profile-role"><?php echo htmlspecialchars(ucfirst($user['tipo_nombre'])); ?></p>
+                        <?php if ($isProfileIncomplete): ?>
+                            <div class="profile-incomplete-warning">
+                                <i class="material-icons-sharp">info</i>
+                                <span>Perfil incompleto</span>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
 

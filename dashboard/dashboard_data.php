@@ -71,7 +71,7 @@ try {
         WHERE p.id_usuario = ?
     ", [$id_usuario]);
 
-    // Fetch available courses
+    // Fetch available courses (exclude already enrolled courses)
     $cursos = getDatabaseData($conn, "
         SELECT c.*, cc.nombre_categoria,
         GROUP_CONCAT(DISTINCT CONCAT(h.dia_semana, ' ', h.hora_inicio, '-', h.hora_fin) SEPARATOR ', ') AS horarios,
@@ -81,9 +81,31 @@ try {
         FROM cursos c
         LEFT JOIN categoria_curso cc ON c.id_categoria = cc.id_categoria
         LEFT JOIN horarios h ON c.id_curso = h.id_curso
-        LEFT JOIN inscripciones i ON c.id_curso = i.id_curso AND i.id_estudiante = ?
-        LEFT JOIN preinscripciones p ON c.id_curso = p.id_curso AND p.id_usuario = ?
+        LEFT JOIN (
+            SELECT i1.* 
+            FROM inscripciones i1
+            WHERE i1.id_estudiante = ?
+            AND i1.id_inscripcion = (
+                SELECT MAX(i2.id_inscripcion) 
+                FROM inscripciones i2 
+                WHERE i2.id_curso = i1.id_curso 
+                AND i2.id_estudiante = i1.id_estudiante
+            )
+        ) i ON c.id_curso = i.id_curso
+        LEFT JOIN (
+            SELECT p1.* 
+            FROM preinscripciones p1
+            WHERE p1.id_usuario = ?
+            AND p1.id_preinscripcion = (
+                SELECT MAX(p2.id_preinscripcion) 
+                FROM preinscripciones p2 
+                WHERE p2.id_curso = p1.id_curso 
+                AND p2.id_usuario = p1.id_usuario
+            )
+        ) p ON c.id_curso = p.id_curso
         WHERE c.estado = 'activo'
+        AND (i.estado IS NULL OR i.estado IN ('rechazada', 'cancelada'))
+        AND (p.estado IS NULL OR p.estado IN ('rechazada', 'cancelada'))
         GROUP BY c.id_curso
     ", [$id_estudiante, $id_usuario]);
 

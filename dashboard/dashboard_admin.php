@@ -1,17 +1,16 @@
 <?php
 // dashboard_admin.php
 
+require_once '../scripts/conexion.php';
+require_once '../scripts/functions.php';
+
+// Obtener el tipo de usuario SIEMPRE desde la base de datos
+$user = getUserInfo($conn, $_SESSION['id_usuario']);
+$_SESSION['id_tipo_usuario'] = $user['id_tipo_usuario'];
+$_SESSION['user_role'] = $user['tipo_nombre'];
+
 // Verificar permisos de administrador
 checkPermission('admin');
-
-// Obtener información básica del usuario
-$id_usuario = $_SESSION['id_usuario'];
-$sql_user = "SELECT * FROM usuario WHERE id_usuario = ?";
-$stmt_user = $conn->prepare($sql_user);
-$stmt_user->bind_param("i", $id_usuario);
-$stmt_user->execute();
-$result_user = $stmt_user->get_result();
-$user = $result_user->fetch_assoc();
 
 // Mostrar notificación de perfil incompleto universal
 include '../scripts/profile_notification.php';

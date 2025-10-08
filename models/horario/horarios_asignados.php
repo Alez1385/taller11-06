@@ -60,11 +60,17 @@ $result = $conn->query($sql);
                             echo '<div class="horario-details">';
                             echo '<h2>' . htmlspecialchars($row["nombre_curso"]) . '</h2>';
                             echo '<p>Profesor: ' . htmlspecialchars($row["nombre_profesor"]) . '</p>';
-                            $dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                            foreach ($dias as $index => $dia) {
-                                $columna = strtolower($dia);
+                            $dias_mapa = [
+                                'Lunes' => 'lunes',
+                                'Martes' => 'martes',
+                                'Miércoles' => 'miercoles',
+                                'Jueves' => 'jueves',
+                                'Viernes' => 'viernes',
+                                'Sábado' => 'sabado'
+                            ];
+                            foreach ($dias_mapa as $dia_label => $columna) {
                                 if (!empty($row[$columna])) {
-                                    echo '<p>' . $dia . ': ' . htmlspecialchars($row[$columna]) . '</p>';
+                                    echo '<p>' . $dia_label . ': ' . htmlspecialchars($row[$columna]) . '</p>';
                                 }
                             }
                             echo '</div>';
@@ -117,6 +123,7 @@ $result = $conn->query($sql);
                 });
             }
         }
+
 
         function filterHorarios() {
             const input = document.getElementById('searchInput');

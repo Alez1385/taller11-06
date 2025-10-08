@@ -35,7 +35,7 @@ try {
     }
 
     // Actualizar el estado de la preinscripción a 'cancelado'
-    $stmt = $pdo->prepare("DELETE FROM preinscripciones WHERE id_preinscripcion = ?");
+    $stmt = $pdo->prepare("UPDATE preinscripciones SET estado = 'cancelada' WHERE id_preinscripcion = ?");
     $stmt->execute([$id_preinscripcion]);
 
     echo json_encode(['success' => true, 'message' => 'Preinscripción cancelada exitosamente']);

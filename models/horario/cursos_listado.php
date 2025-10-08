@@ -46,7 +46,7 @@ $id_usuario = $_SESSION['id_usuario'];
                                 FROM cursos c 
                                 LEFT JOIN categoria_curso cc ON c.id_categoria = cc.id_categoria
                                 JOIN inscripciones i ON c.id_curso = i.id_curso
-                                WHERE i.id_estudiante = (SELECT id_estudiante FROM estudiante WHERE id_usuario = ?)
+                                WHERE i.id_estudiante = (SELECT id_estudiante FROM estudiante WHERE id_usuario = ?) AND i.estado = 'aprobada'
                                 GROUP BY c.id_curso
                                 ORDER BY c.nombre_curso ASC";
                     } elseif ($es_profesor) {
